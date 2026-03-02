@@ -12,26 +12,7 @@ Inspired by Cloudflare's [Code Mode](https://blog.cloudflare.com/code-mode-mcp/)
 
 ## Install
 
-### Option 1: NPM (recommended)
-
-```bash
-npm install -g copilot-context-mode
-```
-
-Then add to your MCP configuration (e.g., `~/.config/github-copilot/mcp.json` or your project's MCP config):
-
-```json
-{
-  "mcpServers": {
-    "context-mode": {
-      "command": "npx",
-      "args": ["-y", "copilot-context-mode"]
-    }
-  }
-}
-```
-
-### Option 2: Local development
+### Option 1: Local development
 
 ```bash
 git clone https://github.com/DriveWealth/copilot-context-mode.git
