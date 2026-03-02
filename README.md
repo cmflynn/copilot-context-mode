@@ -6,8 +6,6 @@
 
 https://github.com/user-attachments/assets/2163dfb6-455a-436e-8dbe-7e7ed1a01cf8
 
-https://github.com/cmflynn/copilot-context-mode/raw/main/demo.mov
-
 Every MCP tool call dumps raw data into your context window. A Playwright snapshot costs 56 KB. Twenty GitHub issues cost 59 KB. One access log — 45 KB. After 30 minutes, 40% of your context is gone.
 
 Inspired by Cloudflare's [Code Mode](https://blog.cloudflare.com/code-mode-mcp/) and [mksglu/claude-context-mode](https://github.com/mksglu/claude-context-mode), this MCP server sits between Copilot and tool outputs. **315 KB becomes 5.4 KB. 98% reduction.**
