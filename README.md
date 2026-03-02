@@ -1,57 +1,59 @@
-# Context Mode
+# Copilot Context Mode
 
-**The other half of the context problem.**
+**The other half of the context problem — adapted for GitHub Copilot.**
 
-[![users](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fmksglu%2Fclaude-context-mode%40main%2Fstats.json&query=%24.message&label=users&color=brightgreen)](https://www.npmjs.com/package/context-mode) [![npm](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fmksglu%2Fclaude-context-mode%40main%2Fstats.json&query=%24.npm&label=npm&color=blue)](https://www.npmjs.com/package/context-mode) [![marketplace](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fmksglu%2Fclaude-context-mode%40main%2Fstats.json&query=%24.marketplace&label=marketplace&color=blue)](https://github.com/mksglu/claude-context-mode) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Every MCP tool call in Claude Code dumps raw data into your 200K context window. A Playwright snapshot costs 56 KB. Twenty GitHub issues cost 59 KB. One access log — 45 KB. After 30 minutes, 40% of your context is gone.
+Every MCP tool call dumps raw data into your context window. A Playwright snapshot costs 56 KB. Twenty GitHub issues cost 59 KB. One access log — 45 KB. After 30 minutes, 40% of your context is gone.
 
-Inspired by Cloudflare's [Code Mode](https://blog.cloudflare.com/code-mode-mcp/) — which compresses tool definitions from millions of tokens into ~1,000 — we asked: what about the other direction?
-
-Context Mode is an MCP server that sits between Claude Code and these outputs. **315 KB becomes 5.4 KB. 98% reduction.**
-
-https://github.com/user-attachments/assets/07013dbf-07c0-4ef1-974a-33ea1207637b
+Inspired by Cloudflare's [Code Mode](https://blog.cloudflare.com/code-mode-mcp/) and [mksglu/claude-context-mode](https://github.com/mksglu/claude-context-mode), this MCP server sits between Copilot and tool outputs. **315 KB becomes 5.4 KB. 98% reduction.**
 
 ## Install
 
-```bash
-/plugin marketplace add mksglu/claude-context-mode
-/plugin install context-mode@claude-context-mode
-```
-
-Restart Claude Code. Done. This installs the MCP server + a PreToolUse hook that automatically routes tool outputs through the sandbox + slash commands for diagnostics and upgrades.
-
-| Command | What it does |
-|---|---|
-| `/context-mode:stats` | Show context savings for the current session — per-tool breakdown, tokens consumed, savings ratio. |
-| `/context-mode:doctor` | Run diagnostics — checks runtimes, hooks, FTS5, plugin registration, npm and marketplace versions. |
-| `/context-mode:upgrade` | Pull latest from GitHub, rebuild, migrate cache, fix hooks. |
-
-<details>
-<summary><strong>MCP-only install</strong> (no hooks or slash commands)</summary>
+### Option 1: NPM (recommended)
 
 ```bash
-claude mcp add context-mode -- npx -y context-mode
+npm install -g copilot-context-mode
 ```
 
-</details>
+Then add to your MCP configuration (e.g., `~/.config/github-copilot/mcp.json` or your project's MCP config):
 
-<details>
-<summary><strong>Local development</strong></summary>
+```json
+{
+  "mcpServers": {
+    "context-mode": {
+      "command": "npx",
+      "args": ["-y", "copilot-context-mode"]
+    }
+  }
+}
+```
+
+### Option 2: Local development
 
 ```bash
-claude --plugin-dir ./path/to/context-mode
+git clone https://github.com/DriveWealth/copilot-context-mode.git
+cd copilot-context-mode && npm install && npm run build
 ```
 
-</details>
+Then add to your MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "context-mode": {
+      "command": "node",
+      "args": ["/path/to/copilot-context-mode/start.mjs"]
+    }
+  }
+}
+```
 
 ## The Problem
 
 MCP has become the standard way for AI agents to use external tools. But there is a tension at its core: every tool interaction fills the context window from both sides — definitions on the way in, raw output on the way out.
 
-With [81+ tools active, 143K tokens (72%) get consumed before your first message](https://scottspence.com/posts/optimising-mcp-server-context-usage-in-claude-code). And then the tools start returning data. A single Playwright snapshot burns 56 KB. A `gh issue list` dumps 59 KB. Run a test suite, read a log file, fetch documentation — each response eats into what remains.
-
-Code Mode showed that tool definitions can be compressed by 99.9%. Context Mode applies the same principle to tool outputs — processing them in sandboxes so only summaries reach the model.
+Context Mode processes tool outputs in sandboxes so only summaries reach the model.
 
 ## Tools
 
@@ -88,49 +90,6 @@ Search uses a three-layer fallback to handle typos, partial terms, and substring
 - **Layer 2 — Trigram substring**: FTS5 trigram tokenizer matches partial strings. "useEff" finds "useEffect", "authenticat" finds "authentication".
 - **Layer 3 — Fuzzy correction**: Levenshtein distance corrects typos before re-searching. "kuberntes" → "kubernetes", "autentication" → "authentication".
 
-The `searchWithFallback` method cascades through all three layers and annotates results with `matchLayer` so you know which layer resolved the query.
-
-## Smart Snippets
-
-Search results use intelligent extraction instead of truncation. Instead of returning the first N characters (which might miss the important part), Context Mode finds where your query terms appear in the content and returns windows around those matches. If your query is "authentication JWT token", you get the paragraphs where those terms actually appear — not an arbitrary prefix.
-
-## Progressive Search Throttling
-
-The `search` tool includes progressive throttling to prevent context flooding from excessive individual calls:
-
-- **Calls 1-3:** Normal results (2 per query)
-- **Calls 4-8:** Reduced results (1 per query) + warning
-- **Calls 9+:** Blocked — redirects to `batch_execute`
-
-This encourages batching queries via `search(queries: ["q1", "q2", "q3"])` or `batch_execute` instead of making dozens of individual calls.
-
-## Session Stats
-
-The `stats` tool tracks context consumption in real-time. Network I/O inside the sandbox is automatically tracked for JS/TS executions.
-
-| Metric | Value |
-|---|---|
-| Session | 1.4 min |
-| Tool calls | 1 |
-| Total data processed | **9.6MB** |
-| Kept in sandbox | **9.6MB** |
-| Entered context | 0.3KB |
-| Tokens consumed | ~82 |
-| **Context savings** | **24,576.0x (99% reduction)** |
-
-| Tool | Calls | Context | Tokens |
-|---|---|---|---|
-| execute | 1 | 0.3KB | ~82 |
-| **Total** | **1** | **0.3KB** | **~82** |
-
-> Without context-mode, **9.6MB** of raw tool output would flood your context window. Instead, **9.6MB** (99%) stayed in sandbox — saving **~2,457,600 tokens** of context space.
-
-## Subagent Routing
-
-When installed as a plugin, Context Mode includes a PreToolUse hook that automatically injects routing instructions into subagent (Task tool) prompts. Subagents learn to use `batch_execute` as their primary tool and `search(queries: [...])` for follow-ups — without any manual configuration.
-
-Bash subagents are automatically upgraded to `general-purpose` so they can access MCP tools. Without this, a `subagent_type: "Bash"` agent only has the Bash tool — it can't call `batch_execute` or `search`, and all raw output floods context.
-
 ## The Numbers
 
 Measured across real-world scenarios:
@@ -138,78 +97,36 @@ Measured across real-world scenarios:
 **Playwright snapshot** — 56.2 KB raw → 299 B context (99% saved)
 **GitHub Issues (20)** — 58.9 KB raw → 1.1 KB context (98% saved)
 **Access log (500 requests)** — 45.1 KB raw → 155 B context (100% saved)
-**Context7 React docs** — 5.9 KB raw → 261 B context (96% saved)
+**React docs** — 5.9 KB raw → 261 B context (96% saved)
 **Analytics CSV (500 rows)** — 85.5 KB raw → 222 B context (100% saved)
 **Git log (153 commits)** — 11.6 KB raw → 107 B context (99% saved)
 **Test output (30 suites)** — 6.0 KB raw → 337 B context (95% saved)
 **Repo research (subagent)** — 986 KB raw → 62 KB context (94% saved, 5 calls vs 37)
 
-Over a full session: 315 KB of raw output becomes 5.4 KB. Session time before slowdown goes from ~30 minutes to ~3 hours. Context remaining after 45 minutes: 99% instead of 60%.
+Over a full session: 315 KB of raw output becomes 5.4 KB.
 
 [Full benchmark data with 21 scenarios →](BENCHMARK.md)
-
-## Try It
-
-These prompts work out of the box. Run `/context-mode:stats` after each to see the savings.
-
-**Deep repo research** — 5 calls, 62 KB context (raw: 986 KB, 94% saved)
-```
-Research https://github.com/modelcontextprotocol/servers — architecture, tech stack,
-top contributors, open issues, and recent activity. Then run /context-mode:stats.
-```
-
-**Git history analysis** — 1 call, 5.6 KB context
-```
-Clone https://github.com/facebook/react and analyze the last 500 commits:
-top contributors, commit frequency by month, and most changed files.
-Then run /context-mode:stats.
-```
-
-**Web scraping** — 1 call, 3.2 KB context
-```
-Fetch the Hacker News front page, extract all posts with titles, scores,
-and domains. Group by domain. Then run /context-mode:stats.
-```
-
-**Large JSON API** — 7.5 MB raw → 0.9 KB context (99% saved)
-```
-Create a local server that returns a 7.5 MB JSON with 20,000 records and a secret
-hidden at index 13000. Fetch the endpoint, find the hidden record, and show me
-exactly what's in it. Then run /context-mode:stats.
-```
-
-**Documentation search** — 2 calls, 1.8 KB context
-```
-Fetch the React useEffect docs, index them, and find the cleanup pattern
-with code examples. Then run /context-mode:stats.
-```
 
 ## Requirements
 
 - **Node.js 18+**
-- **Claude Code** with MCP support
+- **GitHub Copilot** with MCP support
 - Optional: Bun (auto-detected, 3-5x faster JS/TS)
 
 ## Contributing
 
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for the full local development workflow, TDD guidelines, and how to test your changes in a live Claude Code session.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the local development workflow and testing guidelines.
 
 ```bash
-git clone https://github.com/mksglu/claude-context-mode.git
-cd claude-context-mode && npm install
+git clone https://github.com/DriveWealth/copilot-context-mode.git
+cd copilot-context-mode && npm install
 npm test              # run tests
 npm run test:all      # full suite
 ```
 
-## Contributors
+## Credits
 
-<a href="https://github.com/mksglu/claude-context-mode/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=mksglu/claude-context-mode&columns=8&anon=1" />
-</a>
-
-### Special Thanks
-
-<a href="https://github.com/mksglu/claude-context-mode/issues/15"><img src="https://github.com/vaban-ru.png" width="32" /></a>
+Forked from [mksglu/claude-context-mode](https://github.com/mksglu/claude-context-mode) by Mert Koseoğlu. Original concept inspired by Cloudflare's [Code Mode](https://blog.cloudflare.com/code-mode-mcp/).
 
 ## License
 

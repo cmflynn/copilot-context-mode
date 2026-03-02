@@ -22,7 +22,7 @@ const server = new McpServer({
 
 const executor = new PolyglotExecutor({
   runtimes,
-  projectRoot: process.env.CLAUDE_PROJECT_DIR,
+  projectRoot: process.env.PROJECT_DIR,
 });
 
 // Lazy singleton — no DB overhead unless index/search is used
@@ -195,9 +195,9 @@ export function extractSnippet(
 // ─────────────────────────────────────────────────────────
 
 server.registerTool(
-  "execute",
+  "copilot-context-mode-execute",
   {
-    title: "Execute Code",
+    annotations: { title: "copilot-context-mode-execute" },
     description: `Execute code in a sandboxed subprocess. Only stdout enters context — raw data stays in the subprocess. Use instead of bash/cat when output would exceed 20 lines.${bunNote} Available: ${langList}.\n\nPREFER THIS OVER BASH for: API calls (gh, curl, aws), test runners (npm test, pytest), git queries (git log, git diff), data processing, and ANY CLI command that may produce large output. Bash should only be used for file mutations, git writes, and navigation.`,
     inputSchema: z.object({
       language: z
@@ -411,9 +411,9 @@ function intentSearch(
 // ─────────────────────────────────────────────────────────
 
 server.registerTool(
-  "execute_file",
+  "copilot-context-mode-execute_file",
   {
-    title: "Execute File Processing",
+    annotations: { title: "copilot-context-mode-execute_file" },
     description:
       "Read a file and process it without loading contents into context. The file is read into a FILE_CONTENT variable inside the sandbox. Only your printed summary enters context.\n\nPREFER THIS OVER Read/cat for: log files, data files (CSV, JSON, XML), large source files for analysis, and any file where you need to extract specific information rather than read the entire content.",
     inputSchema: z.object({
@@ -527,9 +527,9 @@ server.registerTool(
 // ─────────────────────────────────────────────────────────
 
 server.registerTool(
-  "index",
+  "copilot-context-mode-index",
   {
-    title: "Index Content",
+    annotations: { title: "copilot-context-mode-index" },
     description:
       "Index documentation or knowledge content into a searchable BM25 knowledge base. " +
       "Chunks markdown by headings (keeping code blocks intact) and stores in ephemeral FTS5 database. " +
@@ -621,9 +621,9 @@ const SEARCH_MAX_RESULTS_AFTER = 3; // after 3 calls: 1 result per query
 const SEARCH_BLOCK_AFTER = 8; // after 8 calls: refuse, demand batching
 
 server.registerTool(
-  "search",
+  "copilot-context-mode-search",
   {
-    title: "Search Indexed Content",
+    annotations: { title: "copilot-context-mode-search" },
     description:
       "Search indexed content. Pass ALL search questions as queries array in ONE call.\n\n" +
       "TIPS: 2-4 specific terms per query. Use 'source' to scope results.",
@@ -803,9 +803,9 @@ main();
 }
 
 server.registerTool(
-  "fetch_and_index",
+  "copilot-context-mode-fetch_and_index",
   {
-    title: "Fetch & Index URL",
+    annotations: { title: "copilot-context-mode-fetch_and_index" },
     description:
       "Fetches URL content, converts HTML to markdown, indexes into searchable knowledge base, " +
       "and returns a ~3KB preview. Full content stays in sandbox — use search() for deeper lookups.\n\n" +
@@ -896,9 +896,9 @@ server.registerTool(
 // ─────────────────────────────────────────────────────────
 
 server.registerTool(
-  "batch_execute",
+  "copilot-context-mode-batch_execute",
   {
-    title: "Batch Execute & Search",
+    annotations: { title: "copilot-context-mode-batch_execute" },
     description:
       "Execute multiple commands in ONE call, auto-index all output, and search with multiple queries. " +
       "Returns search results directly — no follow-up calls needed.\n\n" +
@@ -1067,9 +1067,9 @@ server.registerTool(
 // ─────────────────────────────────────────────────────────
 
 server.registerTool(
-  "stats",
+  "copilot-context-mode-stats",
   {
-    title: "Session Statistics",
+    annotations: { title: "copilot-context-mode-stats" },
     description:
       "Returns context consumption statistics for the current session. " +
       "Shows total bytes returned to context, breakdown by tool, call counts, " +

@@ -34,7 +34,7 @@ async function test(name: string, fn: () => Promise<void>) {
 async function main() {
   const runtimes = detectRuntimes();
 
-  console.log("\nCLAUDE_PROJECT_DIR — Unit Tests (PR #12)");
+  console.log("\nPROJECT_DIR — Unit Tests");
   console.log("==========================================\n");
 
   // Set up two isolated directories to simulate the scenario:
@@ -149,8 +149,8 @@ async function main() {
     }
   });
 
-  // ===== CLAUDE_PROJECT_DIR env var integration =====
-  console.log("\n--- CLAUDE_PROJECT_DIR env var integration ---\n");
+  // ===== PROJECT_DIR env var integration =====
+  console.log("\n--- PROJECT_DIR env var integration ---\n");
 
   await test("PolyglotExecutor accepts projectRoot option", async () => {
     const executor = new PolyglotExecutor({
