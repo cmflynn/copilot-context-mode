@@ -32,6 +32,67 @@ Then add to your MCP configuration:
 }
 ```
 
+### Setup
+
+Unlike Claude, GitHub Copilot does not support hooks to automatically activate MCPs. Instead, you must instruct Copilot to use context-mode tools via a global instructions file. Without this, Copilot will ignore the MCP even when it's configured.
+
+Create `~/.copilot/copilot-instructions.md` with the following content:
+
+````markdown
+# Copilot Global Instructions
+
+## Context-Mode Tool Preference
+
+When the **copilot-context-mode MCP** is available, prefer its tools over defaults for any operation that reads,
+queries, fetches, or may produce large output. This keeps context lean and avoids truncation.
+
+### Tool preference rules
+
+| Instead of                                                  | Use                                                                                                        |
+|-------------------------------------------------------------|------------------------------------------------------------------------------------------------------------|
+| `bash` (read-heavy commands)                                | `context-mode-execute`                                                                                     |
+| `view` / `cat` / `head` / `tail`                            | `context-mode-execute_file`                                                                                |
+| multiple sequential `bash`/`execute` calls                  | `context-mode-batch_execute`                                                                               |
+| `web_fetch`                                                 | `context-mode-fetch_and_index` + `context-mode-search`                                                     |
+| loading docs into context directly                          | `context-mode-index` + `context-mode-search`                                                               |
+| large `atlassian-jira_*` / `atlassian-confluence_*` results | call the MCP tool, then **in the same response** immediately pass result to `context-mode-index` + query with `context-mode-search` |
+
+**`bash` is reserved for writes and side effects only:** file mutations (`mkdir`, `mv`, `cp`, `rm`, `touch`, `echo >`,
+redirects), git writes (`add`, `commit`, `push`, `checkout`, `branch`, `merge`), package installs, process
+control (`kill`), and navigation (`cd`, `pwd`).
+
+### Jira / Confluence → context-mode is MANDATORY
+
+**Every** `atlassian-jira_*` or `atlassian-confluence_*` call MUST be followed — in the **same response** —
+by `context-mode-index` to store the result, then `context-mode-search` to retrieve only what's needed. Never leave raw
+Jira/Confluence JSON sitting in the context window.
+
+```
+# Required pattern — always do this in one response:
+1. atlassian-jira_get_issue(issue_key="PROJ-123")        # fetch
+2. context-mode-index(content=<result>, source="Jira: PROJ-123")  # index
+3. context-mode-search(queries=["relevant term"])         # retrieve
+```
+
+### batch_execute is your primary tool
+
+For any task requiring multiple commands or queries, use `batch_execute` in a **single call** with all commands and
+search queries together. This is far more efficient than sequential `execute` calls.
+
+```
+# Good: one batch_execute with commands + queries
+batch_execute(
+  commands=[{label: "...", command: "..."}],
+  queries=["what I'm looking for", "related term"]
+)
+
+# Bad: multiple execute calls
+execute("cmd1") → execute("cmd2") → search("query")
+```
+````
+
+This file is loaded by Copilot at session start and instructs it to route all read-heavy operations through the context-mode MCP tools.
+
 ## The Problem
 
 MCP has become the standard way for AI agents to use external tools. But there is a tension at its core: every tool interaction fills the context window from both sides — definitions on the way in, raw output on the way out.
